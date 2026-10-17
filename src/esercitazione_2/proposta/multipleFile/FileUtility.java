@@ -5,7 +5,7 @@ package esercitazione_2.proposta.multipleFile;
 import java.io.*;
 
 public class FileUtility {
-
+	private static final String prefix="[FileUtility]: "; 
 	/**
 	 * Nota: sorgente e destinazione devono essere correttamente aperti e chiusi
 	 * da chi invoca questa funzione.
@@ -15,20 +15,23 @@ public class FileUtility {
 			DataOutputStream dest, long size) throws IOException {
 	
 		// ciclo di lettura da sorgente e scrittura su destinazione
-	    int buffer;    
+	    int buffer;   
+	    int i=0;
 	    try {
-	    	// esco dal ciclo all lettura di un valore negativo -> EOF
-	    	// N.B.: la funzione consuma l'EOF
-    		System.out.println("\tInizio\t trasferisci_a_byte_file_binario");
-    		for(int i=0;i<size;i++){
+    		System.out.println(prefix+"Inizio trasferisci_a_byte_file_binario");
+    		for(;i<size;i++){
     	    	buffer=src.read();
 	    		dest.write(buffer);
+	    		if(buffer<0) {
+	        		System.out.println(prefix+"Errore");
+	    			break;
+	    		}
 	    	}
-    		System.out.println("\tFine\t trasferisci_a_byte_file_binario\t\tsize:"+size);
+    		System.out.println(prefix+"Fine trasferisci_a_byte_file_binario\t\tsize:"+size+"\t\ttrasf:"+i);
 	    	dest.flush();
 	    }
 	    catch (EOFException e) {
-	    	System.out.println("Problemi, i seguenti: ");
+	    	System.out.println(prefix+"Problemi, i seguenti: ");
 	    	e.printStackTrace();
 	    }
 	}
