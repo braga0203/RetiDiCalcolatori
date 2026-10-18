@@ -1,4 +1,4 @@
-package esercitazione_2.proposta.multipleFile;
+package esercitazione_2.proposta.mPut;
 // PutFileServer Concorrente
 
 import java.io.*;

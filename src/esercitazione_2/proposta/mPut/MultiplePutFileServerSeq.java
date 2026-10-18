@@ -1,4 +1,4 @@
-package esercitazione_2.proposta.multipleFile;
+package esercitazione_2.proposta.mPut;
 // PutFileServer Sequenziale
 
 import java.io.*;
@@ -136,7 +136,6 @@ public class MultiplePutFileServerSeq {
 					String esito = null;
 					{// Trasferimento file
 						try {
-
 							outFile = new FileOutputStream(fileOrdinato);
 							FileUtility.trasferisci_a_byte_file_binario(inSock, new DataOutputStream(outFile), size);
 							outFile.flush();

@@ -1,4 +1,4 @@
-package esercitazione_2.proposta.multipleFile;
+package esercitazione_2.proposta.mGet;
 // PutFileClient.java
 
 import java.net.*;
@@ -7,9 +7,10 @@ import java.util.Arrays;
 
 import java.io.*;
 
-public class MultiplePutFileClient {
-	static final String prefix = "[MultiplePutFile Client]: ";
-	static final String USAGE = "Usage: java PutFileClient serverAddr serverPort";
+public class MultipleGetFileClient {
+	static final String prefix = "[MultipleGetFile Client]: ";
+	static final String USAGE = "Usage: java GetFileClient serverAddr serverPort";
+	static final String storage = "src/file/client/";
 
 	public static void main(String[] args) throws IOException {
 
@@ -40,14 +41,14 @@ public class MultiplePutFileClient {
 		}
 
 		System.out.println(prefix + "avviato...");
-		
+
 		Socket socket = null;
 		DataInputStream inSock = null;
 		DataOutputStream outSock = null;
 		{// Socket
 			try {
 				socket = new Socket(addr, port);
-				socket.setSoTimeout(30000);
+				socket.setSoTimeout(100000);
 				System.out.println(prefix + "Creata la socket: " + socket);
 				inSock = new DataInputStream(socket.getInputStream());
 				outSock = new DataOutputStream(socket.getOutputStream());
@@ -55,35 +56,31 @@ public class MultiplePutFileClient {
 				System.out.println(prefix + "Problemi nella creazione della socket: ");
 				e.printStackTrace();
 				// il client continua l'esecuzione riprendendo dall'inizio del ciclo
-			}	
+			}
 		}
-		
+
 		try {
-			
-			
+
 			while (!terminated) {
 
 				System.out.println("===========================================================");
 				// oggetti defualt input
 				boolean input1 = false;
-				String nomeDir = null;
-				int minSizeFile = -1;
-				File dir = null;
-				BufferedReader stdIn=null;
+
+				String dirName = null;
+				long minSizeFile = -1;
+
+				BufferedReader stdIn = null;
+
 				{// lettura input
 					try {
 						stdIn = new BufferedReader(new InputStreamReader(System.in));
 						while (!input1) {
-							System.out.print(
-									prefix + "^D(Unix)/^Z(Win)+invio per uscire, oppure immetti nome direttorio: ");
-							if ((nomeDir = stdIn.readLine()) == null)
+							System.out.print(prefix
+									+ "^D(Unix)/^Z(Win)+invio per uscire, oppure immetti nome direttorio (DA OTTENERE): ");
+							if ((dirName = stdIn.readLine()) == null)
 								continue;
-							dir = new File(nomeDir);
-							if (!dir.isDirectory()) {
-								System.out.println(prefix + "Directory: " + dir.getAbsolutePath());
-								System.out.println(prefix + "Nome dir non valido");
-								continue;
-							}
+
 							System.out.print(prefix + "immetti dimensione minima file: ");
 							minSizeFile = Integer.valueOf(stdIn.readLine());
 							if (minSizeFile < 1) {
@@ -99,96 +96,138 @@ public class MultiplePutFileClient {
 				}
 
 				// oggetti utilizzati nella comunicazione del input
-				
-
-				File[] files = dir.listFiles();
-				File cur = null;
-				String fileName = null;
 				String risposta = null;
-				long size = -1;
-				
-				FileInputStream fis = null;
+				File dir = null;
+				int nFiles = -1;
+				System.out.println("==============================================================");
+				{ // PREAMBOLO
+					try {
+						outSock.writeUTF(dirName);
+						System.out.println(prefix + "chiedo di ottenere direcotory:" + dirName);
+						risposta = inSock.readUTF();
+						System.out.println(prefix + "ottengo risposta: " + risposta);
+						if ("[ASSENTE]".equals(risposta))
+							continue;
+						dir = new File(dirName);
+						outSock.writeLong(minSizeFile);
+						System.out.println(prefix + "invio lunghezza minima: " + minSizeFile);
+						nFiles = inSock.readInt();
+						System.out.println(prefix + "ottengo numero file : " + nFiles);
+					} catch (SocketTimeoutException ste) {
+						System.err.println(prefix + "Timeout scattato in [PREAMBOLO]");
+						ste.printStackTrace();
+						terminated = true;
+						break;
+					} catch (IOException e) {
+						System.out.println(prefix + "Problemi nella comunicazione del [PREAMBOLO]");
+						e.printStackTrace();
+						terminated = true;
+						break;
+					}
+				}
+				System.out.println("==============================================================");
+
+				FileOutputStream fos = null;
 				String conferma = null;
-				
-				for (int i = 0; i < files.length; i++) { //trasferimetno
-					cur = files[i];
-					if (!cur.isFile() || cur.length() < minSizeFile)
-						continue;
+				for (int i = 0; i < nFiles; i++) {
+					String nomeFile = null;
+					File curFile = null;
+					long size = -1;
 					{ // PROLOGO
 						try {
-							System.out.println("----------------------------------------------------------");
-							fileName = cur.getName();
-							outSock.writeUTF(fileName);
-							System.out.println(prefix + "chiedo se vuole " + fileName);
-							risposta = inSock.readUTF();
-							System.out.println(prefix + "ottengo risposta: " + risposta);
-							if ("[SALTA]".equals(risposta))
-								continue;
-							size = cur.length();
-							outSock.writeLong(size);
-							System.out.println(prefix + "invio dimensione " + size);
+							nomeFile = inSock.readUTF();
+							System.out.println(prefix + "Ricevo nome file : " + nomeFile);
 
-						} catch (SocketTimeoutException ste) {
-							System.err.println(prefix + "Timeout scattato in [PROLOGO] ");
-							ste.printStackTrace();
-							terminated=true;
+							curFile = new File(storage + dirName, nomeFile);
+							if (!curFile.isFile())
+								risposta = "[ATTIVA]";
+							else
+								risposta = "[SALTA]";
+							outSock.writeUTF(risposta);
+							outSock.flush();
+							System.out.println(prefix + "Invio risposta : " + risposta);
+							if (risposta.equals("[SALTA]")) {
+								System.out.println("----------------------------------------------------------------");
+								continue;
+							}
+
+							size = inSock.readLong();
+							System.out.println(prefix + "Ricevo dimensione file " + size);
+
+						} catch (EOFException e) {
+							terminated = true;
 							break;
-						} catch (IOException e) {
-							System.out.println(prefix + "Problemi nella comunicazione del [PROLOGO] ");
-							e.printStackTrace();
-							terminated=true;
+						} catch (SocketTimeoutException ste) {
+							System.out.println(prefix + "Timeout scattato: 1");
+							ste.printStackTrace();
+							terminated = true;
+							break;
+						} catch (Exception e) {
+							terminated = true;
 							break;
 						}
 					}
+					File parentDir=null;
 					{ // TRASFERIMENTO FILE
 						try {
-							fis = new FileInputStream(cur.getPath());
-							FileUtility.trasferisci_a_byte_file_binario(new DataInputStream(fis), outSock, size);
+							//crea se non c'è
+							
+							parentDir=curFile.getParentFile();
+							if(parentDir!=null && !parentDir.exists()) 
+								parentDir.mkdirs();
+							
+							fos = new FileOutputStream(curFile);
+							FileUtility.trasferisci_a_byte_file_binario(inSock, new DataOutputStream(fos), size);
 							conferma = inSock.readUTF();
 							System.out.println(prefix + "ottengo conferma trasmissione " + conferma);
+
 						} catch (FileNotFoundException e) {
 							System.out.println(prefix + "Problemi nella creazione dello stream di input da File: ");
 							e.printStackTrace();
-							terminated=true;
+							terminated = true;
 							break;
 						} catch (SocketTimeoutException ste) {
 							System.out.println(prefix + "Timeout scattato in [TRASFERIMENTO] ");
 							ste.printStackTrace();
-							terminated=true;
+							terminated = true;
 							break;
 						} catch (IOException e) {
 							System.out.println(prefix + "Problemi nel trasferimento dello stream di input da File: ");
 							e.printStackTrace();
-							terminated=true;
+							terminated = true;
 							break;
 						}
 					}
+					System.out.println("----------------------------------------------------------------");
+
 				}
+
 				System.out.println("==============================================================");
-				boolean input2=false;
+				boolean input2 = false;
 				String open = null;
 				while (!input2) {
 					System.out.print(prefix + "Altre richieste (S/N)+invio :");
-					open=stdIn.readLine();
-					if (!"S".equalsIgnoreCase(open)&&!"N".equalsIgnoreCase(open))
+					open = stdIn.readLine();
+					if (!"S".equalsIgnoreCase(open) && !"N".equalsIgnoreCase(open))
 						continue;
-					if("N".equalsIgnoreCase(open)) {
-						terminated=true;
-						System.out.println(prefix+"Chiudo socket");
+					if ("N".equalsIgnoreCase(open)) {
+						terminated = true;
+						System.out.println(prefix + "Chiudo socket");
 						socket.shutdownInput();
 						socket.shutdownOutput();
 						socket.close();
-					}
-					else
-						System.out.println(prefix+"Mantengo aperta socket");
-					input2=true;
+					} else
+						System.out.println(prefix + "Mantengo aperta socket");
+					input2 = true;
 				}
 				System.out.println("==============================================================");
 			}
-			
-			//while (!terminated)
+
+			// while (!terminated)
 			System.out.println(prefix + "termino...");
-		} catch (Exception e) {
+		} catch (
+
+		Exception e) {
 			System.err.println(prefix + "Errore irreversibile, il seguente: ");
 			e.printStackTrace();
 			System.err.println(prefix + "Chiudo!");
